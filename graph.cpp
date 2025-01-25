@@ -5,6 +5,7 @@
 #include <functional>
 #include <algorithm>
 #include <stack>
+#include <climits>
 
 const int TREE = 1;
 const int BACK = 2;
@@ -21,6 +22,25 @@ struct edgenode
     int weight;
     edgenode() : y(0), weight(0) {}
     edgenode(int y, int weight) : y(y), weight(weight) {}
+};
+
+struct edgepair 
+{
+    int x;
+    int y;
+    int weight;
+};
+
+class UnionFind 
+{
+    private:
+        std::vector<int> p;
+        std::vector<int> size;
+        int n;
+    public:
+        UnionFind()
+        {
+        }
 };
 
 class Graph 
@@ -47,6 +67,10 @@ private:
 
     std::vector<std::vector<edgenode>> edges;
 public:
+    Graph()
+    {
+    }
+
     Graph(int nvertices, bool weighted = false)
     {
         this->nvertices = nvertices;
@@ -65,10 +89,11 @@ public:
         nvertices++;
     }
     
-    static void process_vertex_early(int v) {}
-    static void process_edge(int x, int y) {}
-    static void process_vertex_late(int v) {} 
-
+    void addEdge(int v, edgenode e, int weight = 0)
+    {
+        edges[v].push_back(e);
+        edges[e.y].push_back(edgenode(v, weight));
+    }
 
     void addEdge(int vertex1, int vertex2, int weight = 0)
     {
@@ -256,7 +281,7 @@ public:
             if (!discovered[i])
             {
                 color[i] = WHITE;
-                BFS(i, process_vertex_early, process_edge, process_vertex_late); 
+                BFS(i, [](int v) -> void {}, [](int x, int y) -> void {}, [](int v) -> void {}); 
             }
         }
     }
@@ -296,16 +321,151 @@ public:
             {
                 c = c + i;
                 printf("Component %d:", c);
-                BFS(i, process_vertex_early , process_edge, process_vertex_late);
+                BFS(i, [](int v) -> void {}, [](int x, int y) -> void {}, [](int v) -> void {});
             }
         }
     }
 
     void topologicalSort()
     {
-        int i; 
-
         std::stack<int> sorted;
+
+        for (int i = 1; i < this->nvertices; i++)
+        {
+            if (!discovered[i])
+                DFS(i, [](int v) -> void {}, [](int x, int y) -> void {}, [](int v) -> void {});
+        }
+
+        while (!sorted.empty())
+        {
+            printf("%d ", sorted.top());
+        }
+    }
+
+    Graph transpose()
+    {
+        Graph graph(this->nvertices);
+   
+        for (int i = 0; i < this->nvertices; i++)
+        {
+            std::vector<edgenode> edges = this->edges[i];
+            
+            for(edgenode edge : edges)
+            {
+                graph.addEdge(edge.y, i);
+            }
+
+        }
+
+        return graph;
+    }
+
+    void strong_components()
+    {
+        Graph graph;
+
+        std::stack<int> s;
+
+        for (int i = 0; i < this->nvertices; i++)
+        {
+            if (!discovered[i])
+                DFS(i, [&s](int v) -> void { s.push(v); }, [](int x, int y) -> void {}, [](int v) -> void{});
+        }
+
+        graph = this->transpose(); 
+
+        int components_found = 0;
+        int v;
+
+        while (!s.empty())
+        {
+            v = s.top();
+            s.pop();
+            
+            if (!discovered[v])
+            {
+                components_found++; 
+                printf("Component %d:", components_found);
+                DFS(v, [](int v) -> void {}, [](int x, int y) -> void {}, [](int v) -> void {});
+            }
+        }
+    }
+
+    int prim(int s)
+    {
+        std::vector<bool> intree(this->nvertices);
+        std::vector<int> distance(this->nvertices);
+        int v; // current vertex to process
+        int w; // candidate next vertex
+        int dist; // cheapest cost to enlarge tree
+        int weight = 0; // tree weight
+        
+        for (int i = 0; i < this->nvertices; i++)
+        {
+            intree[i] = false;
+            distance[i] = INT_MAX;
+            parent[i] = -1;
+        }
+
+        distance[s] = 0;
+        v = s; 
+
+        while (!intree[v])
+        {
+            intree[v] = true;
+
+            if (v != s)
+            {
+                printf("edge (%d %d) in tree \n", parent[v], v);
+                weight = weight + dist;
+            }
+
+            for (edgenode edge : this->edges[v])
+            {
+                w = edge.y;
+
+                if ((distance[w] > edge.weight) && (!intree[w]))
+                {
+                    distance[w] = edge.weight;
+                    parent[w] = v;
+                }
+            }
+
+            dist = INT_MAX;
+
+            for (int i = 0; i < nvertices; i++)
+            {
+                if ((!intree[i]) && (dist > distance[i]))
+                {
+                    dist = distance[i];
+                    v = i;
+                }
+            }
+        }
+
+        return weight;
+    }
+
+    int kruskal()
+    {
+        unionFind s;
+        std::vector<edgepair> e(this->nvertices);
+        int weight = 0;
+
+        toEdgeArray(e);
+        std::sort(e.begin(), e.end(), []() -> int {});
+
+        for (int i = 0; i < this->edges.size(); i++)
+        {
+            if (!same_component(s, e[i].x, e[i].y))
+            {
+                printf("edge (%d, %d) in MST\n", e[i].x, e[i].y);
+                weight = weight + e[i].weight;
+                union_sets(s, e[i].y, e[i].y);
+            }
+        }
+
+        return weight;
     }
 
     bool havelHakimi(std::vector<int> degrees) {
