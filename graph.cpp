@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <stack>
 #include <climits>
+#include <string>
 
 const int TREE = 1;
 const int BACK = 2;
@@ -128,6 +129,23 @@ private:
     std::vector<int> color;
 
     std::vector<std::vector<edgenode>> edges;
+
+    int bfs(std::vector<std::vector<int>>& rGraph, int s, int t, std::vector<int>& parent) {
+        fill(parent.begin(), parent.end(), -1);
+        std::queue<std::pair<int, int>> q;
+        q.push({s, INT_MAX});
+        while(!q.empty()) {
+            auto [u, flow] = q.front(); q.pop();
+            for(int v=0; v<rGraph.size(); ++v)
+                if(parent[v] == -1 && rGraph[u][v] > 0) {
+                    parent[v] = u;
+                    int new_flow = std::min(flow, rGraph[u][v]);
+                    if(v == t) return new_flow;
+                    q.push({v, new_flow});
+                }
+        }
+        return 0;
+    }
 public:
     Graph()
     {
@@ -667,6 +685,37 @@ public:
         }
     }
 
+    std::vector<int> bellmanFord(int n, std::vector<std::vector<int>>& edges, int src) {
+        std::vector<int> dist(n, INT_MAX);
+        dist[src] = 0;
+        
+        for(int i=0; i<n-1; ++i)
+            for(auto& e : edges)
+                if(dist[e[0]] != INT_MAX && dist[e[1]] > dist[e[0]] + e[2])
+                    dist[e[1]] = dist[e[0]] + e[2];
+        
+        for(auto& e : edges)
+            if(dist[e[0]] != INT_MAX && dist[e[1]] > dist[e[0]] + e[2])
+                return {};
+        
+        return dist;
+    }
+
+    int fordFulkerson(std::vector<std::vector<int>> graph, int s, int t) {
+        std::vector<std::vector<int>> rGraph = graph;
+        std::vector<int> parent(graph.size());
+        int max_flow = 0;
+        while(int flow = bfs(rGraph, s, t, parent)) {
+            max_flow += flow;
+            for(int v=t; v!=s; v=parent[v]) {
+                int u = parent[v];
+                rGraph[u][v] -= flow;
+                rGraph[v][u] += flow;
+            }
+        }
+
+        return max_flow;
+    }
     bool havelHakimi(std::vector<int> degrees) {
         while(true) {
             sort(degrees.rbegin(), degrees.rend());
@@ -690,3 +739,17 @@ public:
         }
     }
 };
+
+
+
+int levenshtein(const std::string& a, const std::string& b) {
+    int m = a.size(), n = b.size();
+    std::vector<std::vector<int>> dp(m+1, std::vector<int>(n+1, 0));
+    for(int i=0; i<=m; ++i) dp[i][0] = i;
+    for(int j=0; j<=n; ++j) dp[0][j] = j;
+    for(int i=1; i<=m; ++i)
+        for(int j=1; j<=n; ++j)
+            dp[i][j] = std::min({dp[i-1][j]+1, dp[i][j-1]+1, 
+                          dp[i-1][j-1] + (a[i-1] != b[j-1])});
+    return dp[m][n];
+}
