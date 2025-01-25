@@ -171,8 +171,8 @@ public:
     
     void addEdge(int v, edgenode e, int weight = 0)
     {
-        edges[v].push_back(e);
-        edges[e.y].push_back(edgenode(v, weight));
+        edges[v].emplace_back(e);
+        edges[e.y].emplace_back(edgenode(v, weight));
     }
 
     void addEdge(int vertex1, int vertex2, int weight = 0)
@@ -183,8 +183,8 @@ public:
         if(vertex2 >= nvertices)
            throw std::out_of_range("Invalid vertex2 index"); 
 
-        edges[vertex1].push_back(edgenode(vertex2, weight));
-        edges[vertex2].push_back(edgenode(vertex1, weight));
+        edges[vertex1].emplace_back(edgenode(vertex2, weight));
+        edges[vertex2].emplace_back(edgenode(vertex1, weight));
     }
 
     void process_articulation_vertex_early(int v) 
