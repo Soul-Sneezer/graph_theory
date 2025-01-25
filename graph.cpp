@@ -20,6 +20,8 @@ struct edgenode
 {
     int y;
     int weight;
+    int flow;
+    int residual;
     edgenode() : y(0), weight(0) {}
     edgenode(int y, int weight) : y(y), weight(weight) {}
 };
@@ -31,6 +33,22 @@ struct edgepair
     int weight;
 };
 
+struct adjacency_matrix 
+{
+    std::vector<std::vector<int>> weight;
+    int nvertices;
+
+    adjacency_matrix(int nvertices)
+    {
+        this->nvertices = nvertices;
+        weight.resize(nvertices);
+        for (int i = 0; i < nvertices; i++)
+        {
+           weight[i].resize(nvertices); 
+        }
+    }
+};
+
 class UnionFind 
 {
     private:
@@ -38,8 +56,52 @@ class UnionFind
         std::vector<int> size;
         int n;
     public:
-        UnionFind()
+        UnionFind(int n)
         {
+            p.resize(n);
+            size.resize(n);
+            for (int i = 0; i < n; i++)
+            {
+               p[i] = i;
+               size[i] = 1;
+            }
+        }
+
+        int find(int x)
+        {
+            if (this->p[x] == x)
+            {
+                return x; 
+            }
+
+            return find(this->p[x]);
+        }
+
+        void union_sets(int s1, int s2)
+        {
+            int r1, r2;
+
+            r1 = find(s1);
+            r2 = find(s2);
+
+            if (r1 == r2)
+                return; 
+
+            if (size[r1] >= size[r2])
+            {
+                size[r1] = size[r1] + size[r2];
+                p[r2] = r1;
+            }
+            else 
+            {
+                size[r2] = size[r1] + size[r2];
+                p[r1] = r2;
+            }
+        }
+
+        bool same_component(int s1, int s2)
+        {
+            return find(s1) == find(s2);
         }
 };
 
@@ -448,24 +510,161 @@ public:
 
     int kruskal()
     {
-        unionFind s;
+        UnionFind s(this->nvertices);
         std::vector<edgepair> e(this->nvertices);
         int weight = 0;
 
-        toEdgeArray(e);
         std::sort(e.begin(), e.end(), []() -> int {});
 
         for (int i = 0; i < this->edges.size(); i++)
         {
-            if (!same_component(s, e[i].x, e[i].y))
+            if (!s.same_component(e[i].x, e[i].y))
             {
                 printf("edge (%d, %d) in MST\n", e[i].x, e[i].y);
                 weight = weight + e[i].weight;
-                union_sets(s, e[i].y, e[i].y);
+                s.union_sets(e[i].y, e[i].y);
             }
         }
 
         return weight;
+    }
+
+    int dijkstra(int start)
+    {
+        std::vector<bool> intree(this->nvertices);
+        std::vector<int> distance(this->nvertices);
+        int v; // current vertex to process
+        int w; // candidate next vertex 
+        int dist; // cheapest cost to enlarge tree
+        int weight = 0; // tree weight
+        
+        for (int i = 0; i < this->nvertices; i++)
+        {
+            intree[i] = false;
+            distance[i] = INT_MAX;
+            parent[i] = -1;
+        }
+
+        distance[start] = 0;
+        v = start;
+
+        while(!intree[v])
+        {
+            intree[v] = true;
+            if (v != start)
+            {
+                printf("edge (%d,%d) in tree \n", parent[v], v);
+                weight = weight + dist;
+            }
+
+            for (edgenode edge : this->edges[v])
+            {
+                w = edge.y;
+                if (distance[w] > (distance[v] + edge.weight))
+                {
+                    distance[w] = distance[v] + p.weight;
+                    parent[w] = v;
+                }
+            }
+
+            dist = INT_MAX;
+
+            for (int i = 0; i <= this->nvertices; i++)
+            {
+                if ((!intree[i]) && (dist > distance[i]))
+                {
+                    dist = distance[i];
+                    v = i;
+                }
+            }
+        }
+
+        return weight;
+    }
+
+    bool valid_edge(edgenode e)
+    {
+        return e.residual > 0;
+    }
+
+    edgenode* find_edge(int x, int y)
+    {
+        for (edgenode edge : this->edges[x])
+        {
+            if (edge.y == y)
+                return &edge;
+        }
+
+        return nullptr;
+    }
+
+    void augment_path(int start, int end, int volume)
+    {
+        edgenode* e;
+
+        if (start == end)
+            return; 
+
+        e = find_edge(parent[end], end);
+        e->flow += volume;
+        e->residual -= volume;
+
+        e = find_edge(end, parent[end]);
+        e->residual += volume;
+
+        augment_path(start, parent[end], volume);
+    }
+
+    int path_volume(int start, int end)
+    {
+        edgenode* e;
+        if (parent[end] == -1)
+            return 0;
+
+        e = find_edge(parent[end], end);
+
+        if (start == parent[end])
+            return e->residual;
+        else 
+            return std::min(path_volume(start, parent[end]), e->residual);
+    }
+
+    int netflow(int source, int sink)
+    {
+        int volume; 
+
+        add_residual_edges();
+
+        BFS(source, [](int v) -> void {}, [](int x, int y) -> void {}, [](int v) -> void {});
+    
+        volume = path_volume (source, sink);
+
+        while (volume > 0)
+        {
+            augment_path(source, sink, volume);
+            BFS(source, [](int  v) -> void {}, [](int x, int y) -> void {}, [](int v) -> void {});
+            volume = path_volume(source, sink);
+        }
+    }
+
+    void floyd (adjacency_matrix* g)
+    {
+        int i, j;
+        int k;
+        int through_k;
+
+        for (k = 0; k < g->nvertices; k++)
+        {
+            for (i = 0; i < g->nvertices; i++)
+            {
+                for (j = 0; j < g->nvertices; j++)
+                {
+                    through_k = g->weight[i][k] + g->weight[k][j];
+                    if (through_k < g->weight[i][j])
+                        g->weight[i][j] = through_k;
+                }
+            }
+        }
     }
 
     bool havelHakimi(std::vector<int> degrees) {
