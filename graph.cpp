@@ -129,7 +129,7 @@ private:
     std::vector<int> color;
 
     std::vector<std::vector<edgenode>> edges;
-
+    
     int bfs(std::vector<std::vector<int>>& rGraph, int s, int t, std::vector<int>& parent) {
         fill(parent.begin(), parent.end(), -1);
         std::queue<std::pair<int, int>> q;
@@ -738,9 +738,107 @@ public:
             }
         }
     }
+
+    std::vector<int> hierholzer(std::vector<std::vector<int>>& adj) {
+        std::vector<int> path;
+        std::stack<int> st;
+        st.push(0);
+        while(!st.empty()) {
+            int u = st.top();
+            if(adj[u].empty()) {
+                path.push_back(u);
+                st.pop();
+            } else {
+                int v = adj[u].back();
+                adj[u].pop_back();
+                st.push(v);
+            }
+        }
+        reverse(path.begin(), path.end());
+        return path;
+    }
+
+    std::vector<std::vector<int>> kosaraju(std::vector<std::vector<int>>& adj) {
+        int n = adj.size();
+        std::vector<int> order;
+        std::vector<bool> visited(n, false);
+        std::function<void(int)> dfs1 = [&](int u) {
+            visited[u] = true;
+            for(int v : adj[u])
+                if(!visited[v]) dfs1(v);
+            order.push_back(u);
+        };
+        for(int i=0; i<n; ++i)
+            if(!visited[i]) dfs1(i);
+        
+        std::vector<std::vector<int>> transpose(n);
+        for(int u=0; u<n; ++u)
+            for(int v : adj[u])
+                transpose[v].push_back(u);
+        
+        std::vector<std::vector<int>> scc;
+        fill(visited.begin(), visited.end(), false);
+        reverse(order.begin(), order.end());
+        std::function<void(int, std::vector<int>&)> dfs2 = [&](int u, std::vector<int>& component) {
+            component.push_back(u);
+            visited[u] = true;
+            for(int v : transpose[u])
+                if(!visited[v]) dfs2(v, component);
+        };
+        for(int u : order)
+            if(!visited[u]) {
+                scc.push_back({});
+                dfs2(u, scc.back());
+            }
+        return scc;
+    }
 };
+int tsp(std::vector<std::vector<int>>& dist) {
+    int n = dist.size();
+    std::vector<std::vector<int>> dp(1<<n, std::vector<int>(n, INT_MAX));
+    dp[1][0] = 0;
+    for(int mask=1; mask<(1<<n); ++mask)
+        for(int u=0; u<n; ++u) if(mask & (1<<u))
+            for(int v=0; v<n; ++v) if(!(mask & (1<<v)) && dist[u][v] != INT_MAX)
+                if(dp[mask][u] != INT_MAX)
+                    dp[mask|(1<<v)][v] = std::min(dp[mask|(1<<v)][v], dp[mask][u] + dist[u][v]);
+    int res = INT_MAX;
+    for(int u=0; u<n; ++u)
+        if(dp[(1<<n)-1][u] != INT_MAX && dist[u][0] != INT_MAX)
+            res = std::min(res, dp[(1<<n)-1][u] + dist[u][0]);
+    return res;
+}
+std::vector<int> kmp(const std::string& pattern) {
+    int m = pattern.size();
+    std::vector<int> lps(m, 0);
+    for(int i=1, len=0; i<m; ) {
+        if(pattern[i] == pattern[len]) {
+            lps[i++] = ++len;
+        } else {
+            if(len) len = lps[len-1];
+            else lps[i++] = 0;
+        }
+    }
+    return lps;
+}
 
-
+std::vector<int> kmpSearch(const std::string& text, const std::string& pattern) {
+    std::vector<int> lps = kmp(pattern);
+    std::vector<int> matches;
+    int n = text.size(), m = pattern.size();
+    for(int i=0, j=0; i<n; ) {
+        if(pattern[j] == text[i]) {
+            i++; j++;
+        }
+        if(j == m) {
+            matches.push_back(i-j);
+            j = lps[j-1];
+        } else if(i < n && pattern[j] != text[i]) {
+            j ? j = lps[j-1] : i++;
+        }
+    }
+    return matches;
+}
 
 int levenshtein(const std::string& a, const std::string& b) {
     int m = a.size(), n = b.size();
