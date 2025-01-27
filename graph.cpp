@@ -111,23 +111,10 @@ class Graph
 private:
     bool weighted;
     bool directed;
-    bool finished;
     bool bipartite; 
 
     int nvertices;
-    int __time;
-    
-    /* these may be used by various algorithms */
-    std::vector<int> parent;
-    std::vector<int> processed;
-    std::vector<int> discovered;
-    std::vector<int> entry_time;
-    std::vector<int> exit_time;
-    std::vector<bool> visited;
-    std::vector<int> reachable_ancestor;
-    std::vector<int> tree_out_degree;
-    std::vector<int> color;
-
+   
     std::vector<std::vector<edgenode>> edges;
     
     int bfs(std::vector<std::vector<int>>& rGraph, int s, int t, std::vector<int>& parent) {
@@ -187,64 +174,6 @@ public:
         edges[vertex2].emplace_back(edgenode(vertex1, weight));
     }
 
-    void process_articulation_vertex_early(int v) 
-    {
-        reachable_ancestor[v] = v;
-    }
-
-    void process_articulation_edge(int x, int y)
-    {
-        int edge_class; 
-
-        edge_class = edge_classification(x, y);
-
-        if (edge_class == TREE)
-            tree_out_degree[x] = tree_out_degree[x] + 1;
-        
-        if ((edge_class == BACK) && (parent[x] != y)) 
-        {
-            if (entry_time[y] < entry_time[reachable_ancestor[x]])
-            {
-                reachable_ancestor[x] = y;
-            }
-        }
-    }
-
-    void process_articulation_vertex_late(int v) 
-    {
-        bool root;
-        int time_v;
-        int time_parent;
-
-        if (parent[v] == -1)
-        {
-            if (tree_out_degree[v] > 1)
-            {
-                printf("root articulation vertex: %d \n", v);
-            }
-            return;
-        }
-
-        root = (parent[parent[v]] == -1);
-
-        if (!root)
-        {
-            if (reachable_ancestor[v] == parent[v])
-            {
-                printf("parent articulation vertex: %d \n", parent[v]);
-                
-                if (tree_out_degree[v] > 0)
-                    printf("bridge articulation vertex: %d \n", v);
-            }
-        }
-
-        time_v = entry_time[reachable_ancestor[v]];
-        time_parent = entry_time[reachable_ancestor[parent[v]]];
-
-        if (time_v < time_parent)
-            reachable_ancestor[parent[v]] = reachable_ancestor[v];
-    }
-
     void BFS(int s, 
             const std::function<void(int)>& process_vertex_early, 
             const std::function<void(int, int)>& process_edge, 
@@ -273,7 +202,11 @@ public:
         }
     }
 
-    int edge_classification(int x, int y)
+    int edge_classification(std::vector<int>& parent, 
+                            std::vector<int>& discovered, 
+                            std::vector<int>& processed, 
+                            std::vector<int>& entry_time, 
+                            int x, int y)
     {
         if (parent[y] == x)
             return (TREE);
@@ -303,17 +236,14 @@ public:
         }
     }
 
-    void edge_detect(int x, int y)
-    {
-        if (parent[y] != x) 
-        {
-            printf("Cycle from %d to %d: ", y, x);
-            find_path(y, x, parent); 
-            finished = true;
-        }
-    }
-
-    void DFS(int s, 
+    void DFS(int s,
+            int& __time,
+            bool& finished,
+            std::vector<int>& discovered,
+            std::vector<int>& entry_time,
+            std::vector<int>& processed,
+            std::vector<int>& parent,
+            std::vector<int>& exit_time,
             const std::function<void(int)>& process_vertex_early, 
             const std::function<void(int,int)>& process_edge, 
             const std::function<void(int)>& process_vertex_late)
@@ -331,7 +261,7 @@ public:
         {
             if (!discovered[edge.y])
             {
-                DFS(edge.y, process_vertex_early, process_edge, process_vertex_late);
+                DFS(edge.y, __time, finished, discovered, entry_time, processed, parent, exit_time, process_vertex_early, process_edge, process_vertex_late);
             }
             else if (((!processed[edge.y]) && (parent[s] != edge.y)) || (this->directed))
                 process_edge(s, edge.y);
@@ -343,6 +273,115 @@ public:
         __time = __time + 1;
         exit_time[s] = __time;
         processed[s] = true;
+    }
+
+    void detectCyles()
+    {
+        int __time = 0;
+        bool finished = false;
+        std::vector<int> reachable_ancestor(this->nvertices);
+        std::vector<int> parent(this->nvertices);
+        std::vector<int> tree_out_degree(this->nvertices);
+        std::vector<int> entry_time(this->nvertices);
+        std::vector<int> discovered(this->nvertices);
+        std::vector<int> processed(this->nvertices);
+        std::vector<int> exit_time(this->nvertices);
+
+        DFS(0,
+            __time,
+            finished,
+            discovered, 
+            entry_time, 
+            processed,
+            parent,
+            exit_time,
+            [](int v) -> void {},
+            [&parent, &finished, this](int x, int y) -> void 
+            {
+                if (parent[y] != x)
+                {
+                    printf("Cycle from %d to %d: ", y, x);
+                    find_path(y, x, parent);
+                    finished = true;
+                }
+            },
+            [](int v) -> void {});
+
+    }
+
+    void detectArticulationEdges()
+    {
+        int __time = 0;
+        bool finished = false;
+        std::vector<int> reachable_ancestor(this->nvertices);
+        std::vector<int> parent(this->nvertices);
+        std::vector<int> tree_out_degree(this->nvertices);
+        std::vector<int> entry_time(this->nvertices);
+        std::vector<int> discovered(this->nvertices);
+        std::vector<int> processed(this->nvertices);
+        std::vector<int> exit_time(this->nvertices);
+
+        DFS(0,
+            __time,
+            finished,
+            discovered, 
+            entry_time, 
+            processed,
+            parent,
+            exit_time,
+            [&reachable_ancestor](int v) -> void 
+            {
+                reachable_ancestor[v] = v;
+            },
+            [&reachable_ancestor, &tree_out_degree, &parent, &entry_time, &discovered, &processed, this](int x, int y) -> void 
+            {
+                int edge_class;
+
+                edge_class = edge_classification(parent, discovered, processed, entry_time, x, y);
+
+                if (edge_class == TREE)
+                    tree_out_degree[x] = tree_out_degree[x] + 1;
+
+                if ((edge_class == BACK) && (parent[x] != y))
+                {
+                    if (entry_time[y] < entry_time[reachable_ancestor[x]])
+                    {
+                        reachable_ancestor[x] = y;
+                    }
+                }
+            },
+            [&reachable_ancestor, &tree_out_degree, &parent, &entry_time](int v) -> void 
+            {
+                bool root;
+                int time_v;
+                int time_parent;
+
+                if (parent[v] == -1)
+                {
+                    if (tree_out_degree[v] > 1)
+                        printf("root articulation vertex: %d \n", v);
+                    return;
+                }
+                
+                root = (parent[parent[v]] == -1);
+
+                if (!root)
+                {
+                    if (reachable_ancestor[v] == parent[v])
+                    {
+                        printf("parent articulation vertex: %d \n", parent[v]);
+
+                        if (tree_out_degree[v] > 0)
+                            printf("bridge articulation vertex: %d \n", v);
+                    }
+                }
+
+                time_v = entry_time[reachable_ancestor[v]];
+                time_parent = entry_time[reachable_ancestor[parent[v]]];
+
+                if (time_v < time_parent)
+                    reachable_ancestor[parent[v]] = reachable_ancestor[v];
+            });
     }
 
     void twocolor()
@@ -410,10 +449,32 @@ public:
     {
         std::stack<int> sorted;
 
+        int __time;
+        bool finished;
+        std::vector<int> discovered(this->nvertices);
+        std::vector<int> processed(this->nvertices);
+        std::vector<int> parent(this->nvertices);
+        std::vector<int> entry_time(this->nvertices);
+        std::vector<int> exit_time(this->nvertices);
+
         for (int i = 1; i < this->nvertices; i++)
         {
             if (!discovered[i])
-                DFS(i, [](int v) -> void {}, [](int x, int y) -> void {}, [](int v) -> void {});
+                DFS(i, 
+                        __time,
+                        finished,
+                        discovered,
+                        entry_time,
+                        processed,
+                        parent,
+                        exit_time,
+                        [&sorted](int v) -> void {sorted.push(v);}, 
+                        [&parent, &discovered, &processed, &entry_time, this](int x, int y) -> void 
+                        {
+                            if (edge_classification(parent, discovered, processed, entry_time, x,y) == BACK)
+                                printf("Warning: directed cycle found, not a DAG\n");
+                        }, 
+                        [](int v) -> void {});
         }
 
         while (!sorted.empty())
@@ -445,11 +506,26 @@ public:
         Graph graph;
 
         std::stack<int> s;
+        int __time;
+        bool finished;
+        std::vector<int> discovered(this->nvertices);
+        std::vector<int> processed(this->nvertices);
+        std::vector<int> parent(this->nvertices);
+        std::vector<int> entry_time(this->nvertices);
+        std::vector<int> exit_time(this->nvertices);
 
         for (int i = 0; i < this->nvertices; i++)
         {
             if (!discovered[i])
-                DFS(i, [&s](int v) -> void { s.push(v); }, [](int x, int y) -> void {}, [](int v) -> void{});
+                DFS(i, 
+                    __time,
+                    finished, 
+                    discovered,
+                    entry_time,
+                    processed,
+                    parent,
+                    exit_time,
+                    [&s](int v) -> void { s.push(v); }, [](int x, int y) -> void {}, [](int v) -> void{});
         }
 
         graph = this->transpose(); 
@@ -466,7 +542,15 @@ public:
             {
                 components_found++; 
                 printf("Component %d:", components_found);
-                DFS(v, [](int v) -> void {}, [](int x, int y) -> void {}, [](int v) -> void {});
+                DFS(v, 
+                    __time,
+                    finished,
+                    discovered,
+                    entry_time,
+                    processed,
+                    parent,
+                    exit_time,
+                    [](int v) -> void {}, [](int x, int y) -> void {}, [](int v) -> void {});
             }
         }
     }
@@ -475,6 +559,7 @@ public:
     {
         std::vector<bool> intree(this->nvertices);
         std::vector<int> distance(this->nvertices);
+        std::vector<int> parent(this->nvertices);
         int v; // current vertex to process
         int w; // candidate next vertex
         int dist; // cheapest cost to enlarge tree
@@ -551,6 +636,7 @@ public:
     {
         std::vector<bool> intree(this->nvertices);
         std::vector<int> distance(this->nvertices);
+        std::vector<int> parent(this->nvertices);
         int v; // current vertex to process
         int w; // candidate next vertex 
         int dist; // cheapest cost to enlarge tree
@@ -580,7 +666,7 @@ public:
                 w = edge.y;
                 if (distance[w] > (distance[v] + edge.weight))
                 {
-                    distance[w] = distance[v] + p.weight;
+                    distance[w] = distance[v] + edge.weight;
                     parent[w] = v;
                 }
             }
@@ -607,10 +693,10 @@ public:
 
     edgenode* find_edge(int x, int y)
     {
-        for (edgenode edge : this->edges[x])
+        for (int i = 0; i < this->edges[x].size(); i++)
         {
-            if (edge.y == y)
-                return &edge;
+            if (this->edges[x][i].y == y)
+                return &this->edges[x][i];
         }
 
         return nullptr;
