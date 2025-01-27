@@ -637,7 +637,7 @@ public:
         std::vector<edgepair> e(this->nvertices);
         int weight = 0;
 
-        std::sort(e.begin(), e.end(), []() -> int {});
+        std::sort(e.begin(), e.end(), [](const edgepair& x, const edgepair& y) -> int {return x.weight < y.weight;} );
 
         for (int i = 0; i < this->edges.size(); i++)
         {
@@ -755,25 +755,41 @@ public:
 
     int netflow(int source, int sink)
     {
-        int volume; 
+        int total_flow = 0; // Accumulate the total flow here
+        int volume;
         std::vector<int> parent(this->nvertices);
         std::vector<bool> processed(this->nvertices);
         std::vector<bool> discovered(this->nvertices);
 
-        add_residual_edges();
+        // Add residual edges to the graph
+        //add_residual_edges();
 
+        // Find the initial augmenting path
+        std::fill(discovered.begin(), discovered.end(), false);
+        std::fill(processed.begin(), processed.end(), false);
         BFS(source, discovered, processed, parent, [](int v) -> void {}, [](int x, int y) -> void {}, [](int v) -> void {});
-    
-        volume = path_volume (parent, source, sink);
 
+        // Compute the volume of the augmenting path
+        volume = path_volume(parent, source, sink);
+
+        // While there is an augmenting path, push flow and update the residual graph
         while (volume > 0)
         {
-            augment_path(parent, source, sink, volume);
-            BFS(source, discovered, processed, parent, [](int  v) -> void {}, [](int x, int y) -> void {}, [](int v) -> void {});
+            total_flow += volume; // Add the flow of this path to the total flow
+            augment_path(parent, source, sink, volume); // Update the flow along the path
+
+            // Find the next augmenting path
+            std::fill(discovered.begin(), discovered.end(), false);
+            std::fill(processed.begin(), processed.end(), false);
+            BFS(source, discovered, processed, parent, [](int v) -> void {}, [](int x, int y) -> void {}, [](int v) -> void {});
+
+            // Compute the volume of the new augmenting path
             volume = path_volume(parent, source, sink);
         }
-    }
 
+        return total_flow; // Return the total flow computed
+    }
+    
     void floyd (adjacency_matrix* g)
     {
         int i, j;
