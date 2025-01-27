@@ -174,37 +174,49 @@ public:
         edges[vertex2].emplace_back(edgenode(vertex1, weight));
     }
 
-    void BFS(int s, 
+    void BFS(int s,
+            std::vector<bool>& discovered,
+            std::vector<bool>& processed,
+            std::vector<int>& parent,
             const std::function<void(int)>& process_vertex_early, 
             const std::function<void(int, int)>& process_edge, 
             const std::function<void(int)>& process_vertex_late) 
     {
         std::priority_queue<int> pq;
-        bool visited[nvertices];
         pq.push(s);
+        discovered[s] = true;
         
         while(!pq.empty())
         {
             int vertex = pq.top(); 
             pq.pop();
             process_vertex_early(vertex);
-            if(!visited[vertex])
+            processed[vertex] = false; 
+
+            for (edgenode edge : this->edges[vertex])
             {
-                visited[vertex] = true;
-                for(edgenode edge : edges[vertex])
+                if ((!processed[edge.y]) || this->directed)
                 {
                     process_edge(vertex, edge.y);
+                }
+
+                if (!discovered[edge.y])
+                {
                     pq.push(edge.y);
+                    discovered[edge.y] = true;
+                    parent[edge.y] = vertex;
                 }
             }
+
+            process_vertex_late(vertex);
 
             process_vertex_late(vertex);
         }
     }
 
     int edge_classification(std::vector<int>& parent, 
-                            std::vector<int>& discovered, 
-                            std::vector<int>& processed, 
+                            std::vector<bool>& discovered, 
+                            std::vector<bool>& processed, 
                             std::vector<int>& entry_time, 
                             int x, int y)
     {
@@ -239,9 +251,9 @@ public:
     void DFS(int s,
             int& __time,
             bool& finished,
-            std::vector<int>& discovered,
+            std::vector<bool>& discovered,
             std::vector<int>& entry_time,
-            std::vector<int>& processed,
+            std::vector<bool>& processed,
             std::vector<int>& parent,
             std::vector<int>& exit_time,
             const std::function<void(int)>& process_vertex_early, 
@@ -283,8 +295,8 @@ public:
         std::vector<int> parent(this->nvertices);
         std::vector<int> tree_out_degree(this->nvertices);
         std::vector<int> entry_time(this->nvertices);
-        std::vector<int> discovered(this->nvertices);
-        std::vector<int> processed(this->nvertices);
+        std::vector<bool> discovered(this->nvertices);
+        std::vector<bool> processed(this->nvertices);
         std::vector<int> exit_time(this->nvertices);
 
         DFS(0,
@@ -317,8 +329,8 @@ public:
         std::vector<int> parent(this->nvertices);
         std::vector<int> tree_out_degree(this->nvertices);
         std::vector<int> entry_time(this->nvertices);
-        std::vector<int> discovered(this->nvertices);
-        std::vector<int> processed(this->nvertices);
+        std::vector<bool> discovered(this->nvertices);
+        std::vector<bool> processed(this->nvertices);
         std::vector<int> exit_time(this->nvertices);
 
         DFS(0,
@@ -387,6 +399,10 @@ public:
     void twocolor()
     {
         int i;
+        std::vector<bool> discovered(this->nvertices);
+        std::vector<bool> processed(this->nvertices);
+        std::vector<int> parent(this->nvertices);
+        std::vector<int> color(this->nvertices);
 
         for (i = 0; i < this->nvertices; i++)
         {
@@ -400,20 +416,21 @@ public:
             if (!discovered[i])
             {
                 color[i] = WHITE;
-                BFS(i, [](int v) -> void {}, [](int x, int y) -> void {}, [](int v) -> void {}); 
+                BFS(i, discovered, processed, parent, 
+                        [](int v) -> void {}, 
+                        [&color, this](int x, int y) -> void 
+                        {
+                            if (color[x] == color[y])
+                            {
+                                this->bipartite = false;
+                                printf("Warning: not bipartite, due to (%d,%d)\n", x, y);
+                            }
+
+                            color[y] = complement(color[x]);
+                        }, 
+                        [](int v) -> void {}); 
             }
         }
-    }
-
-    void bipartite_process_edge(int x, int y)
-    {
-        if (color[x] == color[y])
-        {
-            bipartite = false;
-            printf("Warning: not bipartite, due to (%d,%d)\n", x, y);
-        }
-
-        color[y] = complement(color[x]);
     }
 
     int complement(int color)
@@ -431,6 +448,9 @@ public:
     {
         int c;
         int i;
+        std::vector<bool> discovered(this->nvertices);
+        std::vector<bool> processed(this->nvertices);
+        std::vector<int> parent(this->nvertices);
 
         c = 0;
 
@@ -440,7 +460,7 @@ public:
             {
                 c = c + i;
                 printf("Component %d:", c);
-                BFS(i, [](int v) -> void {}, [](int x, int y) -> void {}, [](int v) -> void {});
+                BFS(i, discovered, processed, parent, [](int v) -> void {}, [](int x, int y) -> void {}, [](int v) -> void {});
             }
         }
     }
@@ -451,8 +471,8 @@ public:
 
         int __time;
         bool finished;
-        std::vector<int> discovered(this->nvertices);
-        std::vector<int> processed(this->nvertices);
+        std::vector<bool> discovered(this->nvertices);
+        std::vector<bool> processed(this->nvertices);
         std::vector<int> parent(this->nvertices);
         std::vector<int> entry_time(this->nvertices);
         std::vector<int> exit_time(this->nvertices);
@@ -508,8 +528,8 @@ public:
         std::stack<int> s;
         int __time;
         bool finished;
-        std::vector<int> discovered(this->nvertices);
-        std::vector<int> processed(this->nvertices);
+        std::vector<bool> discovered(this->nvertices);
+        std::vector<bool> processed(this->nvertices);
         std::vector<int> parent(this->nvertices);
         std::vector<int> entry_time(this->nvertices);
         std::vector<int> exit_time(this->nvertices);
@@ -702,7 +722,7 @@ public:
         return nullptr;
     }
 
-    void augment_path(int start, int end, int volume)
+    void augment_path(std::vector<int>& parent, int start, int end, int volume)
     {
         edgenode* e;
 
@@ -716,10 +736,10 @@ public:
         e = find_edge(end, parent[end]);
         e->residual += volume;
 
-        augment_path(start, parent[end], volume);
+        augment_path(parent, start, parent[end], volume);
     }
 
-    int path_volume(int start, int end)
+    int path_volume(std::vector<int>& parent, int start, int end)
     {
         edgenode* e;
         if (parent[end] == -1)
@@ -730,24 +750,27 @@ public:
         if (start == parent[end])
             return e->residual;
         else 
-            return std::min(path_volume(start, parent[end]), e->residual);
+            return std::min(path_volume(parent, start, parent[end]), e->residual);
     }
 
     int netflow(int source, int sink)
     {
         int volume; 
+        std::vector<int> parent(this->nvertices);
+        std::vector<bool> processed(this->nvertices);
+        std::vector<bool> discovered(this->nvertices);
 
         add_residual_edges();
 
-        BFS(source, [](int v) -> void {}, [](int x, int y) -> void {}, [](int v) -> void {});
+        BFS(source, discovered, processed, parent, [](int v) -> void {}, [](int x, int y) -> void {}, [](int v) -> void {});
     
-        volume = path_volume (source, sink);
+        volume = path_volume (parent, source, sink);
 
         while (volume > 0)
         {
-            augment_path(source, sink, volume);
-            BFS(source, [](int  v) -> void {}, [](int x, int y) -> void {}, [](int v) -> void {});
-            volume = path_volume(source, sink);
+            augment_path(parent, source, sink, volume);
+            BFS(source, discovered, processed, parent, [](int  v) -> void {}, [](int x, int y) -> void {}, [](int v) -> void {});
+            volume = path_volume(parent, source, sink);
         }
     }
 
