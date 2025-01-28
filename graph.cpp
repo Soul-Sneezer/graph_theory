@@ -1,4 +1,4 @@
-#include <iostream>
+#include <fstream>
 #include <vector>
 #include <stdexcept>
 #include <queue>
@@ -114,9 +114,7 @@ private:
     bool bipartite; 
 
     int nvertices;
-   
-    std::vector<std::vector<edgenode>> edges;
-    
+        
     int bfs(std::vector<std::vector<int>>& rGraph, int s, int t, std::vector<int>& parent) {
         fill(parent.begin(), parent.end(), -1);
         std::queue<std::pair<int, int>> q;
@@ -134,14 +132,18 @@ private:
         return 0;
     }
 public:
+    std::vector<std::vector<edgenode>> edges;
+
     Graph()
     {
     }
 
-    Graph(int nvertices, bool weighted = false)
+    Graph(int nvertices, bool directed = false, bool weighted = false)
     {
         this->nvertices = nvertices;
         this->weighted = weighted;
+        this->directed = directed;
+        this->edges.resize(this->nvertices);
     }
     
     Graph(const Graph& other)
@@ -149,6 +151,7 @@ public:
         this->nvertices = other.nvertices;
         this->edges = other.edges;
         this->weighted = other.weighted;
+        this->directed = other.directed;
     }
 
     void newVertex()
@@ -171,7 +174,9 @@ public:
            throw std::out_of_range("Invalid vertex2 index"); 
 
         edges[vertex1].emplace_back(edgenode(vertex2, weight));
-        edges[vertex2].emplace_back(edgenode(vertex1, weight));
+        
+        if (!directed)
+            edges[vertex2].emplace_back(edgenode(vertex1, weight));
     }
 
     void BFS(int s,
@@ -444,7 +449,7 @@ public:
         return UNCOLORED;
     }
 
-    void connected_components()
+    int connected_components()
     {
         int c;
         int i;
@@ -458,11 +463,13 @@ public:
         {
             if (!discovered[i])
             {
-                c = c + i;
-                printf("Component %d:", c);
+                c = c + 1;
+                //printf("Component %d:", c);
                 BFS(i, discovered, processed, parent, [](int v) -> void {}, [](int x, int y) -> void {}, [](int v) -> void {});
             }
         }
+
+        return c;
     }
 
     void topologicalSort()
@@ -975,4 +982,59 @@ int levenshtein(const std::string& a, const std::string& b) {
             dp[i][j] = std::min({dp[i-1][j]+1, dp[i][j-1]+1, 
                           dp[i-1][j-1] + (a[i-1] != b[j-1])});
     return dp[m][n];
+}
+
+std::ifstream in("dfs.in");
+std::ofstream out("dfs.out");
+
+void getIntersction(int& __max, std::vector<int>& level, std::vector<int>& cost, std::vector<int>& parent, int x, int y)
+{
+    if (level[x] > level[y]) 
+        std::swap(x, y);
+
+    while (level[x] < level[y])
+    {
+        __max = std::max(__max, cost[y]);
+        y = parent[y];
+    }
+
+    while (x != y)
+    {
+        __max = std::max(__max, std::max(cost[x], cost[y]));
+        x = parent[x];
+        y = parent[y];
+    }
+}
+
+int main()
+{
+    int n,m,q;
+    in>>n;
+    in>>m;
+    in>>q;
+
+    Graph g(n, false, true);
+
+    for (int i = 0; i < m; i++)
+    {
+        int x, y, z;
+        in>>x>>y>>z;
+
+        g.addEdge(x - 1, y - 1, z);
+    }
+
+    g.kruskal();
+
+    for (int i = 0; i < q; i++)
+    {
+        int x,y;
+        in>>x>>y;
+        g.addEdge(x - 1, y - 1, -1);
+    }
+
+    for (int i = 0; i < g.edges.size(); i++)
+    {
+        //for (int j = 0; j < g.edges[i].size(); j++)
+            //printf("%d %d\n", i, g.edges[i][j].y); 
+    }
 }
