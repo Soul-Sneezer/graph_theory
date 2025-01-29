@@ -26,7 +26,7 @@ struct edgenode
     int flow;
     int residual;
     edgenode() : y(0), weight(0) {}
-    edgenode(int y, int weight) : y(y), weight(weight) {}
+    edgenode(int y, int weight) : y(y), weight(weight), flow(0), residual(weight) {} 
 };
 
 struct edgepair 
@@ -205,6 +205,7 @@ public:
         while(!pq.empty())
         {
             int vertex = pq.top(); 
+            std::cout<<vertex<<"\n";
             pq.pop();
             process_vertex_early(vertex);
             processed[vertex] = false; 
@@ -778,6 +779,30 @@ public:
             return std::min(path_volume(parent, start, parent[end]), e->residual);
     }
 
+    void add_residual_edges() {
+        // Iterate over all edges in the adjacency list
+        for (int u = 0; u < this->nvertices; ++u) {
+            for (auto& edge : this->edges[u]) {
+                int v = edge.y; // Target vertex
+                int capacity = edge.weight; // Capacity of the edge
+
+                // Check if a residual edge from v to u already exists
+                bool residual_exists = false;
+                for (auto& reverse_edge : this->edges[v]) {
+                    if (reverse_edge.y == u) {
+                        residual_exists = true;
+                        break;
+                    }
+                }
+
+                // If no residual edge exists, add one with a capacity of 0
+                if (!residual_exists) {
+                    this->edges[v].emplace_back(edgenode{u, 0});
+                }
+            }
+        }
+    }
+    
     int netflow(int source, int sink)
     {
         int total_flow = 0; // Accumulate the total flow here
@@ -787,16 +812,22 @@ public:
         std::vector<bool> discovered(this->nvertices);
 
         // Add residual edges to the graph
-        //add_residual_edges();
+        add_residual_edges();
 
         // Find the initial augmenting path
         std::fill(discovered.begin(), discovered.end(), false);
         std::fill(processed.begin(), processed.end(), false);
-        BFS(source, discovered, processed, parent, [](int v) -> void {}, [](int x, int y) -> void {}, [](int v) -> void {});
-
+        std::fill(parent.begin(), parent.end(), -1);
+        BFS(source, discovered, processed, parent, [](int v) -> void {}, [&](int x, int y) -> void 
+                {
+edgenode* e = find_edge(x, y);
+                        if (e && e->residual > 0) {
+                            parent[y] = x; 
+                        }
+                }, [](int v) -> void {});
+        
         // Compute the volume of the augmenting path
         volume = path_volume(parent, source, sink);
-
         // While there is an augmenting path, push flow and update the residual graph
         while (volume > 0)
         {
@@ -806,10 +837,18 @@ public:
             // Find the next augmenting path
             std::fill(discovered.begin(), discovered.end(), false);
             std::fill(processed.begin(), processed.end(), false);
-            BFS(source, discovered, processed, parent, [](int v) -> void {}, [](int x, int y) -> void {}, [](int v) -> void {});
+            std::fill(parent.begin(), parent.end(), -1);
+            BFS(source, discovered, processed, parent, [](int v) -> void {}, [&](int x, int y) -> void 
+                    {
+                        edgenode* e = find_edge(x, y);
+                        if (e && e->residual > 0) {
+                            parent[y] = x; 
+                        }
+                    }, [](int v) -> void {});
 
             // Compute the volume of the new augmenting path
             volume = path_volume(parent, source, sink);
+            std::cout<<volume<<" ";
         }
 
         return total_flow; // Return the total flow computed
@@ -1002,7 +1041,7 @@ int levenshtein(const std::string& a, const std::string& b) {
     return dp[m][n];
 }
 
-std::ifstream in("apm.in");
+std::ifstream in("maxflow.in");
 
 void getIntersction(int& __max, std::vector<int>& level, std::vector<int>& cost, std::vector<int>& parent, int x, int y)
 {
@@ -1028,8 +1067,7 @@ int main()
     int n, m;
     in>>n;
     in>>m;
-
-    Graph g(n, false, true);
+    Graph g(n, true, true);
     for (int i = 0; i < m; i++)
     {
         int x, y, z;
@@ -1037,5 +1075,5 @@ int main()
         g.addEdge(x-1,y-1,z);
     }
 
-    std::cout<<g.kruskal();
+    std::cout<<g.fordFulkerson(g.edges, 0, n - 1);
 }
