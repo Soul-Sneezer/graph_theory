@@ -1,3 +1,4 @@
+#include <iostream>
 #include <fstream>
 #include <vector>
 #include <stdexcept>
@@ -7,6 +8,7 @@
 #include <stack>
 #include <climits>
 #include <string>
+#include <unordered_map>
 
 const int TREE = 1;
 const int BACK = 2;
@@ -32,6 +34,8 @@ struct edgepair
     int x;
     int y;
     int weight;
+
+    edgepair(int x, int y, int weight) : x(x), y(y), weight(weight) {}
 };
 
 struct adjacency_matrix 
@@ -47,6 +51,14 @@ struct adjacency_matrix
         {
            weight[i].resize(nvertices); 
         }
+
+        for(int i = 0; i < nvertices; i++)
+        {
+            for(int j = 0; j < nvertices; j++)
+            {
+                weight[i][j] = INT_MAX;
+            }
+        }
     }
 };
 
@@ -54,17 +66,16 @@ class UnionFind
 {
     private:
         std::vector<int> p;
-        std::vector<int> size;
-        int n;
+        std::vector<int> size_;
     public:
         UnionFind(int n)
         {
             p.resize(n);
-            size.resize(n);
+            size_.resize(n);
             for (int i = 0; i < n; i++)
             {
                p[i] = i;
-               size[i] = 1;
+               size_[i] = 1;
             }
         }
 
@@ -88,21 +99,21 @@ class UnionFind
             if (r1 == r2)
                 return; 
 
-            if (size[r1] >= size[r2])
+            if (size_[r1] >= size_[r2])
             {
-                size[r1] = size[r1] + size[r2];
-                p[r2] = r1;
+                this->size_[r1] = size_[r1] + size_[r2];
+                this->p[r2] = r1;
             }
             else 
             {
-                size[r2] = size[r1] + size[r2];
-                p[r1] = r2;
+                this->size_[r2] = size_[r1] + size_[r2];
+                this->p[r1] = r2;
             }
         }
 
         bool same_component(int s1, int s2)
         {
-            return find(s1) == find(s2);
+            return (find(s1) == find(s2));
         }
 };
 
@@ -641,18 +652,25 @@ public:
     int kruskal()
     {
         UnionFind s(this->nvertices);
-        std::vector<edgepair> e(this->nvertices);
+        std::vector<edgepair> e;
         int weight = 0;
+        for(int i = 0; i < this->nvertices; i++)
+        {
+            for(int j = 0; j < this->edges[i].size(); j++)
+            {
+                e.push_back(edgepair(i,this->edges[i][j].y,this->edges[i][j].weight));
+            }
+        }
 
         std::sort(e.begin(), e.end(), [](const edgepair& x, const edgepair& y) -> int {return x.weight < y.weight;} );
 
-        for (int i = 0; i < this->edges.size(); i++)
+        for (int i = 0; i < e.size(); i++)
         {
             if (!s.same_component(e[i].x, e[i].y))
             {
-                printf("edge (%d, %d) in MST\n", e[i].x, e[i].y);
+                std::cout<<"edge " << e[i].x << "," << e[i].y << " in MST\n";
                 weight = weight + e[i].weight;
-                s.union_sets(e[i].y, e[i].y);
+                s.union_sets(e[i].x, e[i].y);
             }
         }
 
@@ -984,8 +1002,7 @@ int levenshtein(const std::string& a, const std::string& b) {
     return dp[m][n];
 }
 
-std::ifstream in("dfs.in");
-std::ofstream out("dfs.out");
+std::ifstream in("apm.in");
 
 void getIntersction(int& __max, std::vector<int>& level, std::vector<int>& cost, std::vector<int>& parent, int x, int y)
 {
@@ -1008,33 +1025,17 @@ void getIntersction(int& __max, std::vector<int>& level, std::vector<int>& cost,
 
 int main()
 {
-    int n,m,q;
+    int n, m;
     in>>n;
     in>>m;
-    in>>q;
 
     Graph g(n, false, true);
-
     for (int i = 0; i < m; i++)
     {
         int x, y, z;
         in>>x>>y>>z;
-
-        g.addEdge(x - 1, y - 1, z);
+        g.addEdge(x-1,y-1,z);
     }
 
-    g.kruskal();
-
-    for (int i = 0; i < q; i++)
-    {
-        int x,y;
-        in>>x>>y;
-        g.addEdge(x - 1, y - 1, -1);
-    }
-
-    for (int i = 0; i < g.edges.size(); i++)
-    {
-        //for (int j = 0; j < g.edges[i].size(); j++)
-            //printf("%d %d\n", i, g.edges[i][j].y); 
-    }
+    std::cout<<g.kruskal();
 }
